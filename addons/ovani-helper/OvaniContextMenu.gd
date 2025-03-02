@@ -1,6 +1,6 @@
 extends EditorContextMenuPlugin
-var song_icon = preload("note.png")
-var player_icon = preload("play.png")
+var song_icon = preload("OvaniSongIcon.png")
+var player_icon = preload("OvaniPlayerIcon.png")
 
 var revert_tail: float
 var song_name: String
