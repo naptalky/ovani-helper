@@ -1,5 +1,7 @@
 # OVANI Helper
 
+This plugin is **not** provided by OVANI.
+
 It's for Godot 4.4+ as that version will include EditorContextMenuPlugin.
 
 To create song right click on folder with files music and choose 'Create OvaniSong'. This will create resource with all all music files and RT.
