@@ -12,11 +12,14 @@ var song_icon: Resource = preload('OvaniSongIcon.png')
 var player_icon: Resource = preload('OvaniPlayerIcon.png')
 
 var songs_collection: Array[OvaniSong] = []
+var folders_with_songs: Array[String] = []
 
 func _popup_menu(paths: PackedStringArray) -> void:
 	add_context_menu_item('Create OvaniSong', create_song, song_icon)
+	add_context_menu_item('Create OvaniSong (multiple)', create_mutliple_songs, song_icon)
 	add_context_menu_item('Create OvaniPlayer', create_player, player_icon)
 
+## Create OvaniSong resource from selected folder
 func create_song(paths: PackedStringArray) -> void:
 	var directory_path: String = paths[0]
 	var regex: RegEx = RegEx.new()
@@ -42,7 +45,16 @@ func create_song(paths: PackedStringArray) -> void:
 	
 	_save_song_resource(ovani_song, target_path)
 
-# Create an OvaniPlayer as a child of current scene
+## Create multiple OvaniSong resources based on folder names in picked folder
+func create_mutliple_songs(paths: PackedStringArray) -> void:
+	folders_with_songs.clear()
+	
+	for song_directory in _get_songs_folders_recursively(paths[0]):
+		create_song([song_directory])
+	if folders_with_songs.size() == 0:
+			print_rich('[color=yellow][b]WARNING:[/b] Didn\'t create any songs sorry. No correct folders found or all folders has songs in them.[/color]')
+
+## Create an OvaniPlayer as a child of current scene
 func create_player(paths: PackedStringArray) -> void:
 	var edited_scene: Node = EditorInterface.get_edited_scene_root()
 	var ovani_player: OvaniPlayer = OvaniPlayer.new()
@@ -60,7 +72,7 @@ func create_player(paths: PackedStringArray) -> void:
 	for song in _get_songs_recursively(paths[0]):
 		ovani_player.QueuedSongs.append(song)
 
-# Get all the OvaniSong resources recursively for a given directory
+## Get all the OvaniSong resources recursively for a given directory
 func _get_songs_recursively(path: String) -> Array[OvaniSong]:
 	var dir: DirAccess = DirAccess.open(path)
 	
@@ -90,7 +102,45 @@ func _get_songs_recursively(path: String) -> Array[OvaniSong]:
 	
 	return songs_collection
 
-# Get all the files in given directory
+## Get all folders that are probably the Ovani folder with music
+func _get_songs_folders_recursively(path: String) -> Array[String]:
+	var regex: RegEx = RegEx.new()
+	regex.compile("([^/]+) \\(RT (\\d+\\.\\d+|\\d+)\\)")
+	var dir: DirAccess = DirAccess.open(path)
+	
+	if !dir:
+		printerr('Directory at ', path, ' could not be opened. Error code: ', dir.get_open_error())
+		
+		return []
+	
+	dir.list_dir_begin()
+	
+	var directory_name: String = dir.get_next()
+	while (!directory_name.is_empty()):
+		var full_path: String = dir.get_current_dir().path_join(directory_name)
+		if dir.current_is_dir() and regex.search(directory_name):
+			# Check if OvaniSong exists
+			var ovani_song_exists: bool = false
+			
+			for file in _get_files_in_directory(full_path):
+				if file.get_extension() == EXTENSION_RESOURCE:
+					var song_resource: Resource = load(full_path.path_join(file))
+					
+					if song_resource is OvaniSong:
+						ovani_song_exists = true
+			
+			if not ovani_song_exists:
+				folders_with_songs.append(full_path)
+		
+		elif dir.current_is_dir() and not regex.search(directory_name):
+			_get_songs_folders_recursively(full_path)
+		
+		directory_name = dir.get_next()
+	
+
+	return folders_with_songs	
+
+## Get all the files in given directory
 func _get_files_in_directory(path: String) -> PackedStringArray:
 	var dir: DirAccess = DirAccess.open(path)
 	
@@ -101,7 +151,7 @@ func _get_files_in_directory(path: String) -> PackedStringArray:
 	
 	return dir.get_files()
 
-# Build OvaniSong resource for given config
+## Build OvaniSong resource for given config
 func _build_ovani_song_resource(path: String, reverb_tail: float) -> OvaniSong:
 	var ovani_song: OvaniSong = OvaniSong.new()
 	
@@ -129,7 +179,7 @@ func _build_ovani_song_resource(path: String, reverb_tail: float) -> OvaniSong:
 	
 	return ovani_song
 
-# Save an OvaniSong resource
+## Save an OvaniSong resource
 func _save_song_resource(ovani_song: OvaniSong, full_path: String) -> void:
 	if ResourceSaver.save(ovani_song, full_path) == OK:
 		print_rich('[color=green][b]SUCCESS:[/b] OvaniSong saved successfully.[/color]')
