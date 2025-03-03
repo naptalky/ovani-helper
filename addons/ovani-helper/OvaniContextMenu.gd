@@ -8,8 +8,8 @@ const NAME_SUFFIX_INTENSITY_3: String = 'Main'
 const EXTENSION_RESOURCE: String = 'tres'
 const EXTENSION_IMPORT: String = 'import'
 
-var song_icon = preload('OvaniSongIcon.png')
-var player_icon = preload('OvaniPlayerIcon.png')
+var song_icon: Resource = preload('OvaniSongIcon.png')
+var player_icon: Resource = preload('OvaniPlayerIcon.png')
 
 var songs_collection: Array[OvaniSong] = []
 
