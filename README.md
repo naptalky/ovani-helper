@@ -3,7 +3,6 @@
 Addon to simplify use of Ovani Plugin from https://ovanisound.com.
 
 This plugin is **not** provided by OVANI.
-<img width="400" alt="ovani_song_multiple" src="https://github.com/user-attachments/assets/ed9e2de8-edd5-4e25-bff1-0d30eb10b0b0" />
 
 ## Requirements
 
