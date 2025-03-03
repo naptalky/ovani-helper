@@ -1,4 +1,5 @@
 @tool
+
 extends EditorPlugin
 
 var pluginScript: Resource = preload('OvaniContextMenu.gd')
