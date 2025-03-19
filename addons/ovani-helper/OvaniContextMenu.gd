@@ -14,45 +14,26 @@ var player_icon: Resource = preload('OvaniPlayerIcon.png')
 var songs_collection: Array[OvaniSong] = []
 var folders_with_songs: Array[String] = []
 
+var regex: RegEx = RegEx.new()
+
 func _popup_menu(paths: PackedStringArray) -> void:
-	add_context_menu_item('Create OvaniSong', create_song, song_icon)
-	add_context_menu_item('Create OvaniSong (multiple)', create_mutliple_songs, song_icon)
+	add_context_menu_item('Create OvaniSongs', create_songs, song_icon)
 	add_context_menu_item('Create OvaniPlayer', create_player, player_icon)
 
-## Create OvaniSong resource from selected folder
-func create_song(paths: PackedStringArray) -> void:
-	var directory_path: String = paths[0]
-	var regex: RegEx = RegEx.new()
-	
-	# Get song's title
-	regex.compile("([^/]+) \\(RT (\\d+\\.\\d+|\\d+)\\)")
-	var name_result: RegExMatch = regex.search(directory_path)
-	
-	if (!name_result):
-		printerr('No song name found in path: ', directory_path)
-		
-		return
-	
-	var song_name: String = name_result.get_string(1).to_lower()
-	var reverb_tail: float = name_result.get_string(2).to_float()
-	
-	# Replace all groups of non-alphanumeric values with underscore
-	regex.compile("[^a-zA-Z0-9]+")
-	song_name = regex.sub(song_name, '_', true)
-	
-	var ovani_song: OvaniSong = _build_ovani_song_resource(directory_path, reverb_tail)
-	var target_path: String = directory_path.path_join(song_name + '.' + EXTENSION_RESOURCE)
-	
-	_save_song_resource(ovani_song, target_path)
 
 ## Create multiple OvaniSong resources based on folder names in picked folder
-func create_mutliple_songs(paths: PackedStringArray) -> void:
+func create_songs(paths: PackedStringArray) -> void:
 	folders_with_songs.clear()
 	
-	for song_directory in _get_songs_folders_recursively(paths[0]):
-		create_song([song_directory])
+	if _check_if_ovani_song_directory(paths[0]):
+		_create_song(paths[0])
+		folders_with_songs.append(paths[0])
+	else:
+		for song_directory in _get_songs_folders_recursively(paths[0]):
+			_create_song(song_directory)
+	
 	if folders_with_songs.size() == 0:
-			print_rich('[color=yellow][b]WARNING:[/b] Didn\'t create any songs sorry. No correct folders found or all folders has songs in them.[/color]')
+		print_rich('[color=yellow][b]WARNING:[/b] Didn\'t create any songs sorry. No correct folders found or all folders has songs in them.[/color]')
 
 ## Create an OvaniPlayer as a child of current scene
 func create_player(paths: PackedStringArray) -> void:
@@ -60,9 +41,33 @@ func create_player(paths: PackedStringArray) -> void:
 	var ovani_player: OvaniPlayer = OvaniPlayer.new()
 	
 	if (edited_scene):
-		edited_scene.add_child(ovani_player)
-		ovani_player.set_owner(edited_scene)
-		ovani_player.set_name('OvaniPlayer')
+		match(ProjectSettings.get_setting("Ovani Helper/Settings/Player/On create")):
+			"Update existing one":
+				var find_one: bool = false
+				for child in edited_scene.find_children("*"):
+					if child is OvaniPlayer:
+						ovani_player = child
+						ovani_player.QueuedSongs.clear()
+						find_one = true
+				if(!find_one):
+					ovani_player.Volume = ProjectSettings.get_setting("Ovani Helper/Settings/Player/Volume")
+					ovani_player.Intensity = ProjectSettings.get_setting("Ovani Helper/Settings/Player/Intensity")
+					ovani_player.PlayInEditor = ProjectSettings.get_setting("Ovani Helper/Settings/Player/Play In Editor")
+					ovani_player.Bus = ProjectSettings.get_setting("Ovani Helper/Settings/Player/Bus")
+					ovani_player.LoopQueue = ProjectSettings.get_setting("Ovani Helper/Settings/Player/Loop Queue")
+					edited_scene.add_child(ovani_player)
+					ovani_player.set_owner(edited_scene)
+					ovani_player.set_name('OvaniPlayer')
+			"Create new":
+				# zmienic na pobrane z settingsow
+				ovani_player.Volume = ProjectSettings.get_setting("Ovani Helper/Settings/Player/Volume")
+				ovani_player.Intensity = ProjectSettings.get_setting("Ovani Helper/Settings/Player/Intensity")
+				ovani_player.PlayInEditor = ProjectSettings.get_setting("Ovani Helper/Settings/Player/Play In Editor")
+				ovani_player.Bus = ProjectSettings.get_setting("Ovani Helper/Settings/Player/Bus")
+				ovani_player.LoopQueue = ProjectSettings.get_setting("Ovani Helper/Settings/Player/Loop Queue")
+				edited_scene.add_child(ovani_player)
+				ovani_player.set_owner(edited_scene)
+				ovani_player.set_name('OvaniPlayer')
 	
 	# Reset songs_collection before recursive search
 	# so we don't get duplicated results.
@@ -71,6 +76,34 @@ func create_player(paths: PackedStringArray) -> void:
 	# Add all the OvaniSong resources found under given directory
 	for song in _get_songs_recursively(paths[0]):
 		ovani_player.QueuedSongs.append(song)
+	ovani_player.notify_property_list_changed()
+
+
+## Create OvaniSong resource from selected folder
+func _create_song(directory_path: String) -> void:
+	# Get song's title
+	var name_result: RegExMatch = _check_if_ovani_song_directory(directory_path)
+	
+	var song_name: String = name_result.get_string(1).to_lower()
+	var reverb_tail: float = name_result.get_string(2).to_float()
+	
+	# Replace all groups of non-alphanumeric values with underscore
+	regex.compile("[^a-zA-Z0-9]+")
+	var delimiter: String = ""
+	match(ProjectSettings.get_setting("Ovani Helper/Settings/Song/Name delimiter")):
+		"dash":
+			delimiter = "-"
+		"space":
+			delimiter = " "
+		"underscore": 
+			delimiter = "_"
+	
+	song_name = regex.sub(song_name, delimiter, true)
+	
+	var ovani_song: OvaniSong = _build_ovani_song_resource(directory_path, reverb_tail)
+	var target_path: String = directory_path.path_join(song_name + '.' + EXTENSION_RESOURCE)
+	
+	_save_song_resource(ovani_song, target_path)
 
 ## Get all the OvaniSong resources recursively for a given directory
 func _get_songs_recursively(path: String) -> Array[OvaniSong]:
@@ -110,7 +143,6 @@ func _get_songs_folders_recursively(path: String) -> Array[String]:
 	
 	if !dir:
 		printerr('Directory at ', path, ' could not be opened. Error code: ', dir.get_open_error())
-		
 		return []
 	
 	dir.list_dir_begin()
@@ -177,6 +209,14 @@ func _build_ovani_song_resource(path: String, reverb_tail: float) -> OvaniSong:
 		elif file.contains(NAME_SUFFIX_INTENSITY_3):
 			ovani_song.Intensity3 = song_resource
 	
+	match(ProjectSettings.get_setting("Ovani Helper/Settings/Song/Mode")):
+		"Intensities":
+			ovani_song.SongMode = ovani_song.OvaniMode.Intensities
+		"Loop 30":
+			ovani_song.SongMode = ovani_song.OvaniMode.Loop30
+		"Loop 60":
+			ovani_song.SongMode = ovani_song.OvaniMode.Loop60
+	
 	return ovani_song
 
 ## Save an OvaniSong resource
@@ -185,3 +225,8 @@ func _save_song_resource(ovani_song: OvaniSong, full_path: String) -> void:
 		print_rich('[color=green][b]SUCCESS:[/b] OvaniSong saved successfully.[/color]')
 	else:
 		printerr('Failed to save OvaniSong.')
+
+## Checks if folder is in Ovani name style
+func _check_if_ovani_song_directory(path: String) -> RegExMatch:
+	regex.compile("([^/]+) \\(RT (\\d+\\.\\d+|\\d+)\\)")
+	return regex.search(path)
